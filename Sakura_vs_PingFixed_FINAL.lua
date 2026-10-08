@@ -6632,7 +6632,7 @@ function loadAllSettings()
     CONFIG.AUTO_STEAL_ENABLED = data.autoSteal or false
     medusaCounterEnabled = data.medusaCounter or false
     batCounterEnabled = data.batCounter or false
-    batCounterV2Enabled = data.batCounterV2 or false
+    batCounterV2Enabled = false -- Bat Counter V3 removed
     if data.batCounterV3Stud and tonumber(data.batCounterV3Stud) then
         local s = tonumber(data.batCounterV3Stud)
         if s > 0 and s <= 30 then
@@ -6651,7 +6651,7 @@ function loadAllSettings()
         if setJumpVisual then setJumpVisual(false) end
     end
     infJumpMode = (data.infJumpMode == "MANUAL") and "MANUAL" or "HOLD"
-    if infJumpModeLabel then infJumpModeLabel.Text = infJumpMode end
+    if infJumpModeLabel then infJumpModeLabel.Text = tostring(infJumpMode or "HOLD") .. "  ▼" end
     autoStealVariant = _clamp(tonumber(data.autoStealVariant) or 1, 1, 3)
     if autoStealVariantLabel then autoStealVariantLabel.Text = autoStealVariantName(autoStealVariant) end
     katanaSkinEnabled = data.katanaSkinEnabled == true
@@ -6873,7 +6873,7 @@ function loadAllSettings()
     autoBatEnabled = false
     autoLeftEnabled = false
     autoRightEnabled = false
-    if dropModeBtnRef then dropModeBtnRef.Text = dropMode == 1 and "Fling" or "Jump Drop" end
+    if dropModeBtnRef then dropModeBtnRef.Text = (dropMode == 1 and "Fling" or "Jump Drop") .. "  ▼" end
     refreshSpeedModeLabel()
 
     -- Ping Lagger settings restore
@@ -6942,7 +6942,7 @@ function forceResetUI()
     if batSpeedBox then batSpeedBox.Text = tostring(BAT_AIMBOT_SPEED) end
     if batCounterV3StudBox then batCounterV3StudBox.Text = tostring(BAT_COUNTER_V2_TOUCH_DIST or 2.5) end
     if uiScaleBox then uiScaleBox.Text = tostring(uiScaleValue) end
-    if dropModeBtnRef then dropModeBtnRef.Text = dropMode == 1 and "Fling" or "Jump Drop" end
+    if dropModeBtnRef then dropModeBtnRef.Text = (dropMode == 1 and "Fling" or "Jump Drop") .. "  ▼" end
     if bodyLockRangeBox then bodyLockRangeBox.Text = tostring(bodyLockRange) end
     if carrySysNormalBox then carrySysNormalBox.Text = tostring(CarrySystem.normalSpeed) end
     if carrySysCarryBox then carrySysCarryBox.Text = tostring(CarrySystem.carrySpeed) end
@@ -10207,11 +10207,97 @@ function buildGui()
     do
         local row = mkRow(combatPage, 38)
         mkLabel(row, "Drop Mode")
-        dropModeBtnRef = mkSelector(row, dropMode == 1 and "Fling" or "Jump Drop", {"Fling", "Jump Drop"}, function(dir, update)
-            if dropActive then stopDropBrainrot() end
-            dropMode = dropMode == 1 and 2 or 1
-            update(dropMode == 1 and "Fling" or "Jump Drop")
+        local selectorBtn = Instance.new("TextButton", row)
+        selectorBtn.Size = UDim2.new(0, 120, 0, 26)
+        selectorBtn.Position = UDim2.new(1, -128, 0.5, -13)
+        selectorBtn.BackgroundColor3 = INP
+        selectorBtn.BackgroundTransparency = 0.12
+        selectorBtn.BorderSizePixel = 0
+        selectorBtn.Text = (dropMode == 1 and "Fling" or "Jump Drop") .. "  ▼"
+        selectorBtn.TextColor3 = WHITE
+        selectorBtn.Font = Enum.Font.GothamBold
+        selectorBtn.TextSize = 12
+        selectorBtn.AutoButtonColor = false
+        selectorBtn.ZIndex = 12
+        Instance.new("UICorner", selectorBtn).CornerRadius = UDim.new(0, 8)
+        local selStroke = Instance.new("UIStroke", selectorBtn)
+        selStroke.Color = Color3.fromRGB(220, 220, 225)
+        selStroke.Thickness = 1.2
+        selStroke.Transparency = 0.35
+        dropModeBtnRef = selectorBtn
+
+        local dropdown = Instance.new("Frame", combatPage)
+        dropdown.Name = "DropModeDrop"
+        dropdown.Size = UDim2.new(1, -16, 0, 0)
+        dropdown.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+        dropdown.BackgroundTransparency = 0.15
+        dropdown.BorderSizePixel = 0
+        dropdown.Visible = false
+        dropdown.ClipsDescendants = true
+        dropdown.ZIndex = 30
+        dropdown.LayoutOrder = getNextOrder(combatPage)
+        Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 10)
+        local dropStroke = Instance.new("UIStroke", dropdown)
+        dropStroke.Color = Color3.fromRGB(220, 220, 225)
+        dropStroke.Thickness = 1.2
+        dropStroke.Transparency = 0.3
+        local dropList = Instance.new("UIListLayout", dropdown)
+        dropList.FillDirection = Enum.FillDirection.Vertical
+        dropList.Padding = UDim.new(0, 4)
+        dropList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        local dropPad = Instance.new("UIPadding", dropdown)
+        dropPad.PaddingTop = UDim.new(0, 6)
+        dropPad.PaddingBottom = UDim.new(0, 6)
+
+        local modes = {"Fling", "Jump Drop"}
+        local expanded = false
+        local optButtons = {}
+        local function currentName()
+            return dropMode == 1 and "Fling" or "Jump Drop"
+        end
+        local function refreshOpts()
+            for _, b in ipairs(optButtons) do
+                local active = (b.Name == currentName())
+                b.BackgroundColor3 = active and Color3.fromRGB(220, 220, 225) or Color3.fromRGB(22, 26, 32)
+                b.TextColor3 = active and Color3.fromRGB(8, 10, 14) or WHITE
+            end
+            selectorBtn.Text = currentName() .. (expanded and "  ▲" or "  ▼")
+        end
+        for _, modeName in ipairs(modes) do
+            local b = Instance.new("TextButton", dropdown)
+            b.Name = modeName
+            b.Size = UDim2.new(1, -16, 0, 28)
+            b.BackgroundColor3 = Color3.fromRGB(22, 26, 32)
+            b.BorderSizePixel = 0
+            b.Text = modeName
+            b.TextColor3 = WHITE
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 13
+            b.AutoButtonColor = false
+            b.ZIndex = 31
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
+            b.MouseButton1Click:Connect(function()
+                dropMode = (modeName == "Fling") and 1 or 2
+                expanded = false
+                dropdown.Visible = false
+                dropdown.Size = UDim2.new(1, -16, 0, 0)
+                refreshOpts()
+                pcall(saveAllSettings)
+            end)
+            table.insert(optButtons, b)
+        end
+        selectorBtn.MouseButton1Click:Connect(function()
+            expanded = not expanded
+            if expanded then
+                dropdown.Size = UDim2.new(1, -16, 0, 6 + (#modes * 32) + 6)
+                dropdown.Visible = true
+            else
+                dropdown.Visible = false
+                dropdown.Size = UDim2.new(1, -16, 0, 0)
+            end
+            refreshOpts()
         end)
+        refreshOpts()
     end
 
     mkSect(combatPage, "Counters")
@@ -10220,20 +10306,6 @@ function buildGui()
         if on then startBatCounter() else stopBatCounter() end
     end)
 
-    setBatCounterV2Visual = mkToggle(combatPage, "Bat Counter V3", function(on)
-        batCounterV2Enabled = on
-        if on then startBatCounterV2() else stopBatCounterV2() end
-    end)
-    do
-        local row = mkRow(combatPage, 38)
-        mkLabel(row, "Bat Counter V3 Stud")
-        batCounterV3StudBox = mkBox(row, BAT_COUNTER_V2_TOUCH_DIST or 10, 50, 56, function(v)
-            if v and v > 0 and v <= 30 then
-                BAT_COUNTER_V2_TOUCH_DIST = v
-                pcall(saveAllSettings)
-            end
-        end)
-    end
 
     setMedusaVisual = mkToggle(combatPage, "Medusa Counter", function(on)
         medusaCounterEnabled = on
@@ -10735,22 +10807,97 @@ function buildGui()
     do
         local row = mkRow(visualPage, 38)
         mkLabel(row, "Jump Mode")
-        infJumpModeLabel = mkSelector(row, tostring(infJumpMode or "HOLD"), {"HOLD", "MANUAL"}, function(dir, updateLabel)
-            local modes = {"HOLD", "MANUAL"}
-            local idx = 1
-            for i, m in ipairs(modes) do
-                if m == tostring(infJumpMode) then idx = i; break end
+        local selectorBtn = Instance.new("TextButton", row)
+        selectorBtn.Size = UDim2.new(0, 110, 0, 26)
+        selectorBtn.Position = UDim2.new(1, -118, 0.5, -13)
+        selectorBtn.BackgroundColor3 = INP
+        selectorBtn.BackgroundTransparency = 0.12
+        selectorBtn.BorderSizePixel = 0
+        selectorBtn.Text = tostring(infJumpMode or "HOLD") .. "  ▼"
+        selectorBtn.TextColor3 = WHITE
+        selectorBtn.Font = Enum.Font.GothamBold
+        selectorBtn.TextSize = 12
+        selectorBtn.AutoButtonColor = false
+        selectorBtn.ZIndex = 12
+        Instance.new("UICorner", selectorBtn).CornerRadius = UDim.new(0, 8)
+        local selStroke = Instance.new("UIStroke", selectorBtn)
+        selStroke.Color = Color3.fromRGB(220, 220, 225)
+        selStroke.Thickness = 1.2
+        selStroke.Transparency = 0.35
+        infJumpModeLabel = selectorBtn
+
+        local dropdown = Instance.new("Frame", visualPage)
+        dropdown.Name = "JumpModeDrop"
+        dropdown.Size = UDim2.new(1, -16, 0, 0)
+        dropdown.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+        dropdown.BackgroundTransparency = 0.15
+        dropdown.BorderSizePixel = 0
+        dropdown.Visible = false
+        dropdown.ClipsDescendants = true
+        dropdown.ZIndex = 30
+        dropdown.LayoutOrder = getNextOrder(visualPage)
+        Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 10)
+        local dropStroke = Instance.new("UIStroke", dropdown)
+        dropStroke.Color = Color3.fromRGB(220, 220, 225)
+        dropStroke.Thickness = 1.2
+        dropStroke.Transparency = 0.3
+        local dropList = Instance.new("UIListLayout", dropdown)
+        dropList.FillDirection = Enum.FillDirection.Vertical
+        dropList.Padding = UDim.new(0, 4)
+        dropList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        local dropPad = Instance.new("UIPadding", dropdown)
+        dropPad.PaddingTop = UDim.new(0, 6)
+        dropPad.PaddingBottom = UDim.new(0, 6)
+
+        local modes = {"HOLD", "MANUAL"}
+        local expanded = false
+        local optButtons = {}
+        local function refreshOpts()
+            for _, b in ipairs(optButtons) do
+                local active = (b.Name == tostring(infJumpMode))
+                b.BackgroundColor3 = active and Color3.fromRGB(220, 220, 225) or Color3.fromRGB(22, 26, 32)
+                b.TextColor3 = active and Color3.fromRGB(8, 10, 14) or WHITE
             end
-            idx = idx + dir
-            if idx < 1 then idx = #modes end
-            if idx > #modes then idx = 1 end
-            infJumpMode = modes[idx]
-            if infJumpMode == "MANUAL" then
-                pcall(_G.AmbitiousStopNormalInfJumpHoldState)
+            selectorBtn.Text = tostring(infJumpMode or "HOLD") .. (expanded and "  ▲" or "  ▼")
+        end
+        for _, modeName in ipairs(modes) do
+            local b = Instance.new("TextButton", dropdown)
+            b.Name = modeName
+            b.Size = UDim2.new(1, -16, 0, 28)
+            b.BackgroundColor3 = Color3.fromRGB(22, 26, 32)
+            b.BorderSizePixel = 0
+            b.Text = modeName
+            b.TextColor3 = WHITE
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 13
+            b.AutoButtonColor = false
+            b.ZIndex = 31
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
+            b.MouseButton1Click:Connect(function()
+                infJumpMode = modeName
+                if infJumpMode == "MANUAL" then
+                    pcall(_G.AmbitiousStopNormalInfJumpHoldState)
+                end
+                expanded = false
+                dropdown.Visible = false
+                dropdown.Size = UDim2.new(1, -16, 0, 0)
+                refreshOpts()
+                pcall(saveAllSettings)
+            end)
+            table.insert(optButtons, b)
+        end
+        selectorBtn.MouseButton1Click:Connect(function()
+            expanded = not expanded
+            if expanded then
+                dropdown.Size = UDim2.new(1, -16, 0, 6 + (#modes * 32) + 6)
+                dropdown.Visible = true
+            else
+                dropdown.Visible = false
+                dropdown.Size = UDim2.new(1, -16, 0, 0)
             end
-            updateLabel(infJumpMode)
-            saveAllSettings()
+            refreshOpts()
         end)
+        refreshOpts()
     end
 
     do
@@ -10891,15 +11038,95 @@ function buildGui()
     do
         local row = mkRow(configPage, 38)
         mkLabel(row, "Auto Steal Mode")
-        autoStealVariantLabel = mkSelector(row, autoStealVariantName(autoStealVariant), AUTO_STEAL_VARIANT_NAMES, function(dir, updateLabel)
-            local idx = autoStealVariant or 1
-            idx = idx + dir
-            if idx < 1 then idx = #AUTO_STEAL_VARIANT_NAMES end
-            if idx > #AUTO_STEAL_VARIANT_NAMES then idx = 1 end
-            autoStealVariant = idx
-            updateLabel(autoStealVariantName(idx))
-            saveAllSettings()
+        local selectorBtn = Instance.new("TextButton", row)
+        selectorBtn.Size = UDim2.new(0, 130, 0, 26)
+        selectorBtn.Position = UDim2.new(1, -138, 0.5, -13)
+        selectorBtn.BackgroundColor3 = INP
+        selectorBtn.BackgroundTransparency = 0.12
+        selectorBtn.BorderSizePixel = 0
+        selectorBtn.Text = autoStealVariantName(autoStealVariant) .. "  ▼"
+        selectorBtn.TextColor3 = WHITE
+        selectorBtn.Font = Enum.Font.GothamBold
+        selectorBtn.TextSize = 12
+        selectorBtn.AutoButtonColor = false
+        selectorBtn.ZIndex = 12
+        Instance.new("UICorner", selectorBtn).CornerRadius = UDim.new(0, 8)
+        local selStroke = Instance.new("UIStroke", selectorBtn)
+        selStroke.Color = Color3.fromRGB(220, 220, 225)
+        selStroke.Thickness = 1.2
+        selStroke.Transparency = 0.35
+        autoStealVariantLabel = selectorBtn
+
+        local dropdown = Instance.new("Frame", configPage)
+        dropdown.Name = "AutoStealModeDrop"
+        dropdown.Size = UDim2.new(1, -16, 0, 0)
+        dropdown.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+        dropdown.BackgroundTransparency = 0.15
+        dropdown.BorderSizePixel = 0
+        dropdown.Visible = false
+        dropdown.ClipsDescendants = true
+        dropdown.ZIndex = 30
+        dropdown.LayoutOrder = getNextOrder(configPage)
+        Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 10)
+        local dropStroke = Instance.new("UIStroke", dropdown)
+        dropStroke.Color = Color3.fromRGB(220, 220, 225)
+        dropStroke.Thickness = 1.2
+        dropStroke.Transparency = 0.3
+        local dropList = Instance.new("UIListLayout", dropdown)
+        dropList.FillDirection = Enum.FillDirection.Vertical
+        dropList.Padding = UDim.new(0, 4)
+        dropList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        local dropPad = Instance.new("UIPadding", dropdown)
+        dropPad.PaddingTop = UDim.new(0, 6)
+        dropPad.PaddingBottom = UDim.new(0, 6)
+
+        local expanded = false
+        local optButtons = {}
+        local function refreshOpts()
+            local cur = autoStealVariantName(autoStealVariant)
+            for _, b in ipairs(optButtons) do
+                local active = (b.Name == cur)
+                b.BackgroundColor3 = active and Color3.fromRGB(220, 220, 225) or Color3.fromRGB(22, 26, 32)
+                b.TextColor3 = active and Color3.fromRGB(8, 10, 14) or WHITE
+            end
+            selectorBtn.Text = cur .. (expanded and "  ▲" or "  ▼")
+        end
+        for i, modeName in ipairs(AUTO_STEAL_VARIANT_NAMES) do
+            local b = Instance.new("TextButton", dropdown)
+            b.Name = modeName
+            b.Size = UDim2.new(1, -16, 0, 28)
+            b.BackgroundColor3 = Color3.fromRGB(22, 26, 32)
+            b.BorderSizePixel = 0
+            b.Text = modeName
+            b.TextColor3 = WHITE
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 13
+            b.AutoButtonColor = false
+            b.ZIndex = 31
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
+            local idx = i
+            b.MouseButton1Click:Connect(function()
+                autoStealVariant = idx
+                expanded = false
+                dropdown.Visible = false
+                dropdown.Size = UDim2.new(1, -16, 0, 0)
+                refreshOpts()
+                pcall(saveAllSettings)
+            end)
+            table.insert(optButtons, b)
+        end
+        selectorBtn.MouseButton1Click:Connect(function()
+            expanded = not expanded
+            if expanded then
+                dropdown.Size = UDim2.new(1, -16, 0, 6 + (#AUTO_STEAL_VARIANT_NAMES * 32) + 6)
+                dropdown.Visible = true
+            else
+                dropdown.Visible = false
+                dropdown.Size = UDim2.new(1, -16, 0, 0)
+            end
+            refreshOpts()
         end)
+        refreshOpts()
     end
 
     mkSect(configPage, "UI Settings")
@@ -11146,8 +11373,8 @@ function buildGui()
     -- ============================================================
     pbFrame = Instance.new("Frame", gui)
     -- Görseldeki uzunluk / yükseklik oranına yakın
-    pbFrame.Size = UDim2.new(0, 460, 0, 48)
-    pbFrame.Position = UDim2.new(0.5, -230, 1, -62)
+    pbFrame.Size = UDim2.new(0, 440, 0, 52)
+    pbFrame.Position = UDim2.new(0.5, -220, 1, -66)
     pbFrame.BackgroundColor3 = Color3.fromRGB(18, 28, 42)
     pbFrame.BackgroundTransparency = 0.18
     pbFrame.BorderSizePixel = 0
@@ -11156,9 +11383,9 @@ function buildGui()
     pbFrame.Visible = CONFIG.AUTO_STEAL_ENABLED
     pbFrame.ZIndex = 50
 
-    -- Tam kapsül kenarlar (görseldeki gibi yuvarlak uçlar)
+    -- Dikdörtgen + hafif yuvarlak kenar (foto tarzı)
     local pbCorner = Instance.new("UICorner", pbFrame)
-    pbCorner.CornerRadius = UDim.new(1, 0)
+    pbCorner.CornerRadius = UDim.new(0, 14)
 
     local pbBorder = Instance.new("UIStroke", pbFrame)
     pbBorder.Name = "StealBarStroke"
@@ -12425,7 +12652,7 @@ function updateUIFromLoaded()
             MinecraftBatSkin.SetColorMode(minecraftBatSkinColorMode or "Default")
         end
     end)
-    if dropModeBtnRef then dropModeBtnRef.Text = dropMode == 1 and "Fling" or "Jump Drop" end
+    if dropModeBtnRef then dropModeBtnRef.Text = (dropMode == 1 and "Fling" or "Jump Drop") .. "  ▼" end
     if bodyLockRangeBox then bodyLockRangeBox.Text = tostring(bodyLockRange) end
     if carrySysNormalBox then carrySysNormalBox.Text = tostring(CarrySystem.normalSpeed) end
     if carrySysCarryBox then carrySysCarryBox.Text = tostring(CarrySystem.carrySpeed) end
@@ -12477,8 +12704,8 @@ function updateUIFromLoaded()
         if setAntiDieVisual then setAntiDieVisual(false) end
     end
 
-    if autoStealVariantLabel then autoStealVariantLabel.Text = autoStealVariantName(autoStealVariant or 1) end
-    if infJumpModeLabel then infJumpModeLabel.Text = tostring(infJumpMode or "HOLD") end
+    if autoStealVariantLabel then autoStealVariantLabel.Text = autoStealVariantName(autoStealVariant or 1) .. "  ▼" end
+    if infJumpModeLabel then infJumpModeLabel.Text = tostring(infJumpMode or "HOLD") .. "  ▼" end
     if CONFIG.AUTO_STEAL_ENABLED and setInstaGrab then setInstaGrab(true); pcall(startAutoSteal) end
     if antiAimbotEnabled then pcall(enableAntiAimbot) end
 
@@ -12494,10 +12721,9 @@ function updateUIFromLoaded()
         setBatCounterVisual(true)
         startBatCounter()
     end
-    if batCounterV2Enabled and setBatCounterV2Visual then
-        setBatCounterV2Visual(true)
-        startBatCounterV2()
-    end
+    -- Bat Counter V3 removed
+    batCounterV2Enabled = false
+    pcall(stopBatCounterV2)
     if unwalkEnabled and setUnwalkVisual then
         setUnwalkVisual(true)
         task.spawn(function() task.wait(0.5); startUnwalk() end)
