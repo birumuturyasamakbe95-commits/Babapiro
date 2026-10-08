@@ -64,7 +64,7 @@ LAGGER_CARRY_SPEED = 24.5
 MEDUSA_COOLDOWN = 25
 BAT_AIMBOT_SPEED = 58
 BYPASS_AIMBOT_SPEED = 60
-batAimbotMode = "Normal" -- Normal | Bypass | V3
+batAimbotMode = "Normal" -- Normal | V3
 batAimbotModeLabel = nil
 _specBypass = { conn = nil, swingCD = false }
 MOBILE_PANEL_WIDTH = 128
@@ -4108,7 +4108,7 @@ end
 
 local function _adaptBypassTick(dt)
     if not _adaptBypass.enabled then return end
-    if not autoBatEnabled or tostring(batAimbotMode or "Normal") ~= "Bypass" then return end
+    if not antiAimbotEnabled then return end
     local char = LP.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -4215,10 +4215,9 @@ end
 
 function startSpectrumBypassAimbot()
     stopSpectrumBypassAimbot()
-    stopAimbotAdapt()
-    if type(stopAimbotV3) == "function" then pcall(stopAimbotV3) end
-    if batDesyncTpEnabled then stopBatDesyncTp() end
-    if autoBatV2Enabled then disableBatV2() end
+    -- AntiAimbot only — do NOT touch Bat Aimbot (autoBatEnabled / visuals / mode)
+    if batDesyncTpEnabled then pcall(stopBatDesyncTp) end
+    if autoBatV2Enabled then pcall(disableBatV2) end
     if autoLeftEnabled then
         autoLeftEnabled = false
         if autoLeftSetVisual then autoLeftSetVisual(false) end
@@ -4229,8 +4228,15 @@ function startSpectrumBypassAimbot()
         if autoRightSetVisual then autoRightSetVisual(false) end
         stopAutoRight()
     end
-    autoBatEnabled = true
-    batAimbotMode = "Bypass"
+    -- Bat Aimbot açıksa kapat (çakışmasın)
+    if autoBatEnabled then
+        autoBatEnabled = false
+        if autoBatSetVisual then pcall(autoBatSetVisual, false) end
+        if mobSetAutoBat then pcall(mobSetAutoBat, false) end
+        pcall(stopAimbotAdapt)
+        pcall(stopAimbotV3)
+    end
+
     _adaptBypass.enabled = true
     _adaptBypass.equipped = false
     _adaptBypass.target = nil
@@ -4252,33 +4258,29 @@ function startSpectrumBypassAimbot()
     end
     if type(_suppressBodyLock) == "function" then pcall(_suppressBodyLock) end
 
-    -- VX7 uses RenderStepped for smoother swim mover
     _adaptBypass.conn = RunService.RenderStepped:Connect(function(dt)
         _adaptBypassTick(dt)
     end)
     _adaptBypass.safetyConn = RunService.Heartbeat:Connect(function()
         if not _adaptBypass.enabled then return end
-        if not autoBatEnabled or tostring(batAimbotMode or "Normal") ~= "Bypass" then return end
+        if not antiAimbotEnabled then return end
         local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-        -- re-ensure mover if destroyed by game
         if not hrp:FindFirstChild(_adaptBypass.moverName) then
             local spd = tonumber(BYPASS_AIMBOT_SPEED) or tonumber(BAT_AIMBOT_SPEED) or 58
             _vx7EnsureMover(hrp, spd)
         end
     end)
-
-    if autoBatSetVisual then pcall(function() autoBatSetVisual(true) end) end
-    if mobSetAutoBat then pcall(function() mobSetAutoBat(true) end) end
 end
 
 -- keep legacy aliases used elsewhere
 _specBypass = _adaptBypass
 
-local BAT_AIMBOT_MODES = {"Normal", "Bypass", "V3"}
+local BAT_AIMBOT_MODES = {"Normal", "V3"}
 
 function setBatAimbotMode(mode)
     mode = tostring(mode or "Normal")
+    if mode == "Bypass" then mode = "Normal" end -- Bypass artık AntiAimbot'ta
     local ok = false
     for _, m in ipairs(BAT_AIMBOT_MODES) do
         if m == mode then ok = true; break end
@@ -4287,14 +4289,10 @@ function setBatAimbotMode(mode)
     batAimbotMode = mode
     if batAimbotModeLabel then batAimbotModeLabel.Text = tostring(batAimbotMode) .. "  ▼" end
     if autoBatEnabled then
-        if batAimbotMode == "Bypass" then
-            startSpectrumBypassAimbot()
-        elseif batAimbotMode == "V3" then
-            stopSpectrumBypassAimbot()
+        if batAimbotMode == "V3" then
             stopAimbotAdapt()
             startAimbotV3()
         else
-            stopSpectrumBypassAimbot()
             stopAimbotV3()
             stopAimbotAdapt()
             startAimbotAdapt()
@@ -4677,7 +4675,7 @@ function disableAutoBat()
     if mobSetAutoBat then mobSetAutoBat(false) end
     stopAimbotAdapt()
     stopAimbotV3()
-    stopSpectrumBypassAimbot()
+    -- Spectrum (Bypass) sadece AntiAimbot'a ait; Bat Aimbot kapanınca onu kapatma
 end
 
 
@@ -4688,24 +4686,6 @@ function enableAntiAimbot()
         local f = antiAimbotFloatingButton:FindFirstChild("Frame")
         if f then paintFloatingBtn(f, true) end
     end
-    if autoLeftEnabled then
-        autoLeftEnabled = false
-        if autoLeftSetVisual then autoLeftSetVisual(false) end
-        stopAutoLeft()
-    end
-    if autoRightEnabled then
-        autoRightEnabled = false
-        if autoRightSetVisual then autoRightSetVisual(false) end
-        stopAutoRight()
-    end
-    if batDesyncTpEnabled then pcall(stopBatDesyncTp) end
-    if autoBatV2Enabled then pcall(disableBatV2) end
-    -- Normal auto bat kapanirsa carpisma olmasin
-    if autoBatEnabled and tostring(batAimbotMode or "") ~= "Bypass" then
-        pcall(disableAutoBat)
-    end
-    batAimbotMode = "Bypass"
-    if batAimbotModeLabel then batAimbotModeLabel.Text = "Bypass  ▼" end
     startSpectrumBypassAimbot()
 end
 
@@ -4741,18 +4721,25 @@ function enableAutoBat()
     end
     if batDesyncTpEnabled then toggleBatDesyncTp() end
     if autoBatV2Enabled then disableBatV2() end
+    -- AntiAimbot açıksa kapat (çakışmasın)
+    if antiAimbotEnabled then
+        antiAimbotEnabled = false
+        stopSpectrumBypassAimbot()
+        if mobSetAntiAimbot then pcall(mobSetAntiAimbot, false) end
+        if antiAimbotFloatingButton then
+            local f = antiAimbotFloatingButton:FindFirstChild("Frame")
+            if f then paintFloatingBtn(f, false) end
+        end
+    end
     autoBatEnabled = true
     if autoBatSetVisual then autoBatSetVisual(true) end
     if mobSetAutoBat then mobSetAutoBat(true) end
     local mode = tostring(batAimbotMode or "Normal")
-    if mode == "Bypass" then
-        startSpectrumBypassAimbot()
-    elseif mode == "V3" then
-        stopSpectrumBypassAimbot()
+    if mode == "Bypass" then mode = "Normal"; batAimbotMode = "Normal" end
+    if mode == "V3" then
         stopAimbotAdapt()
         startAimbotV3()
     else
-        stopSpectrumBypassAimbot()
         stopAimbotV3()
         startAimbotAdapt()
     end
@@ -6826,8 +6813,10 @@ function loadAllSettings()
     if setFovVisual then setFovVisual(fovEnabled) end
     stretchFOV = data.stretchFOV or 120
     BAT_AIMBOT_SPEED = data.batAimbotSpeed or BAT_AIMBOT_SPEED
-    if data.batAimbotMode == "Bypass" or data.batAimbotMode == "Normal" or data.batAimbotMode == "V3" then
+    if data.batAimbotMode == "Normal" or data.batAimbotMode == "V3" then
         batAimbotMode = data.batAimbotMode
+    elseif data.batAimbotMode == "Bypass" then
+        batAimbotMode = "Normal" -- Bypass artık AntiAimbot
     end
     if data.autoBatEnabled then
         task.defer(function()
@@ -11153,27 +11142,29 @@ function buildGui()
     spacer.ZIndex = 7
 
     -- ============================================================
-    -- AUTO STEAL BAR — long rectangle, red/white (image layout)
+    -- AUTO STEAL BAR — image style (capsule edges + size)
     -- ============================================================
     pbFrame = Instance.new("Frame", gui)
-    pbFrame.Size = UDim2.new(0, 420, 0, 42)
-    pbFrame.Position = UDim2.new(0.5, -210, 1, -56)
-    pbFrame.BackgroundColor3 = Color3.fromRGB(20, 24, 34)
-    pbFrame.BackgroundTransparency = 0.08
+    -- Görseldeki uzunluk / yükseklik oranına yakın
+    pbFrame.Size = UDim2.new(0, 460, 0, 48)
+    pbFrame.Position = UDim2.new(0.5, -230, 1, -62)
+    pbFrame.BackgroundColor3 = Color3.fromRGB(18, 28, 42)
+    pbFrame.BackgroundTransparency = 0.18
     pbFrame.BorderSizePixel = 0
     pbFrame.Active = true
     pbFrame.ClipsDescendants = true
     pbFrame.Visible = CONFIG.AUTO_STEAL_ENABLED
     pbFrame.ZIndex = 50
 
+    -- Tam kapsül kenarlar (görseldeki gibi yuvarlak uçlar)
     local pbCorner = Instance.new("UICorner", pbFrame)
-    pbCorner.CornerRadius = UDim.new(0, 12)
+    pbCorner.CornerRadius = UDim.new(1, 0)
 
     local pbBorder = Instance.new("UIStroke", pbFrame)
     pbBorder.Name = "StealBarStroke"
-    pbBorder.Color = Color3.fromRGB(230, 50, 60)
-    pbBorder.Thickness = 1.5
-    pbBorder.Transparency = 0.12
+    pbBorder.Color = Color3.fromRGB(70, 110, 140)
+    pbBorder.Thickness = 1.2
+    pbBorder.Transparency = 0.35
     pbBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     pbScale = Instance.new("UIScale", pbFrame)
@@ -11182,17 +11173,17 @@ function buildGui()
     if savedProgressBarPos then
         pbFrame.Position = UDim2.new(
             savedProgressBarPos.XScale or 0.5,
-            savedProgressBarPos.XOffset or -210,
+            savedProgressBarPos.XOffset or -230,
             savedProgressBarPos.YScale or 1,
-            savedProgressBarPos.YOffset or -56
+            savedProgressBarPos.YOffset or -62
         )
     end
 
     -- SOL: %
     local leftCol = Instance.new("Frame", pbFrame)
     leftCol.Name = "LeftCol"
-    leftCol.Size = UDim2.new(0, 54, 1, -6)
-    leftCol.Position = UDim2.new(0, 10, 0, 3)
+    leftCol.Size = UDim2.new(0, 58, 1, -10)
+    leftCol.Position = UDim2.new(0, 16, 0, 5)
     leftCol.BackgroundTransparency = 1
     leftCol.ZIndex = 55
 
@@ -11202,27 +11193,27 @@ function buildGui()
     progressPct.BackgroundTransparency = 1
     progressPct.Text = "0%"
     progressPct.TextColor3 = Color3.fromRGB(255, 255, 255)
-    progressPct.Font = Enum.Font.GothamBlack
-    progressPct.TextSize = 16
+    progressPct.Font = Enum.Font.GothamBold
+    progressPct.TextSize = 17
     progressPct.TextXAlignment = Enum.TextXAlignment.Left
     progressPct.TextYAlignment = Enum.TextYAlignment.Center
     progressPct.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    progressPct.TextStrokeTransparency = 0.3
+    progressPct.TextStrokeTransparency = 0.4
     progressPct.ZIndex = 56
 
-    -- ORTA: progress
+    -- ORTA: progress track (görseldeki ince uzun bar)
     local progressRow = Instance.new("Frame", pbFrame)
     progressRow.Name = "ProgressRow"
-    progressRow.Size = UDim2.new(1, -220, 0, 11)
-    progressRow.Position = UDim2.new(0, 66, 0.5, -5.5)
+    progressRow.Size = UDim2.new(1, -240, 0, 12)
+    progressRow.Position = UDim2.new(0, 74, 0.5, -6)
     progressRow.BackgroundTransparency = 1
     progressRow.ZIndex = 54
 
     local fillRegion = Instance.new("Frame", progressRow)
     fillRegion.Name = "FillRegion"
     fillRegion.Size = UDim2.new(1, 0, 1, 0)
-    fillRegion.BackgroundColor3 = Color3.fromRGB(28, 32, 42)
-    fillRegion.BackgroundTransparency = 0.1
+    fillRegion.BackgroundColor3 = Color3.fromRGB(25, 40, 55)
+    fillRegion.BackgroundTransparency = 0.25
     fillRegion.BorderSizePixel = 0
     fillRegion.ClipsDescendants = true
     fillRegion.ZIndex = 55
@@ -11231,31 +11222,31 @@ function buildGui()
     progressFill = Instance.new("Frame", fillRegion)
     progressFill.Name = "ProgressFill"
     progressFill.Size = UDim2.new(0, 0, 1, 0)
-    progressFill.BackgroundColor3 = Color3.fromRGB(230, 45, 55)
+    progressFill.BackgroundColor3 = Color3.fromRGB(80, 170, 230)
     progressFill.BorderSizePixel = 0
     progressFill.ZIndex = 56
     Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
     local fillGrad = Instance.new("UIGradient", progressFill)
     fillGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(170, 20, 30)),
-        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 70, 80)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(40, 130, 200)),
+        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(100, 200, 245)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(220, 245, 255)),
     })
 
     local glowEnd = Instance.new("Frame", progressFill)
-    glowEnd.Size = UDim2.new(0, 12, 1, 0)
-    glowEnd.Position = UDim2.new(1, -12, 0, 0)
+    glowEnd.Size = UDim2.new(0, 14, 1, 0)
+    glowEnd.Position = UDim2.new(1, -14, 0, 0)
     glowEnd.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    glowEnd.BackgroundTransparency = 0.4
+    glowEnd.BackgroundTransparency = 0.45
     glowEnd.BorderSizePixel = 0
     glowEnd.ZIndex = 57
     Instance.new("UICorner", glowEnd).CornerRadius = UDim.new(1, 0)
 
-    -- SAĞ: FPS - MS
+    -- SAĞ: FPS - MS (görseldeki gibi barın sağ içi)
     local rightCol = Instance.new("Frame", pbFrame)
     rightCol.Name = "RightCol"
-    rightCol.Size = UDim2.new(0, 130, 1, -6)
-    rightCol.Position = UDim2.new(1, -138, 0, 3)
+    rightCol.Size = UDim2.new(0, 140, 1, -10)
+    rightCol.Position = UDim2.new(1, -152, 0, 5)
     rightCol.BackgroundTransparency = 1
     rightCol.ZIndex = 55
 
@@ -11264,15 +11255,16 @@ function buildGui()
     fpsNeon.Size = UDim2.new(1, 0, 1, 0)
     fpsNeon.BackgroundTransparency = 1
     fpsNeon.Text = "--FPS - --ms"
-    fpsNeon.TextColor3 = Color3.fromRGB(255, 255, 255)
-    fpsNeon.Font = Enum.Font.GothamBold
+    fpsNeon.TextColor3 = Color3.fromRGB(200, 220, 235)
+    fpsNeon.Font = Enum.Font.GothamMedium
     fpsNeon.TextSize = 12
     fpsNeon.TextXAlignment = Enum.TextXAlignment.Right
     fpsNeon.TextYAlignment = Enum.TextYAlignment.Center
     fpsNeon.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    fpsNeon.TextStrokeTransparency = 0.35
+    fpsNeon.TextStrokeTransparency = 0.45
     fpsNeon.ZIndex = 56
 
+    -- Discord yok
     local discordLabelTop = Instance.new("TextLabel", pbFrame)
     discordLabelTop.Name = "DiscordLabel"
     discordLabelTop.Visible = false
