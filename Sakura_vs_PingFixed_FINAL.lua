@@ -1357,6 +1357,9 @@ stretchFOV = 120
 uiLocked = true
 editModeEnabled = false
 uiScaleValue = 78
+stealBarScale = 100
+antiAimbotEnabled = false
+setAntiAimbotVisual = nil
 espEnabled = false
 
 bodyLockEnabled = false
@@ -2171,7 +2174,7 @@ setAntiRagVisual, setJumpVisual, setUnwalkVisual, setAntiLagVisual, setLockUIVis
 setAntiDieVisual = nil
 setEditModeVisual = nil
 setESPVIsual = nil
-mobSetAutoBat, mobSetAntiBat, mobSetAutoLeft, mobSetAutoRight, mobSetDropBR, mobSetTpDown, mobSetCarry, mobSetLagger1, mobSetLagger2 = nil, nil, nil, nil, nil, nil, nil, nil, nil
+mobSetAutoBat, mobSetAntiBat, mobSetAutoLeft, mobSetAutoRight, mobSetDropBR, mobSetTpDown, mobSetCarry, mobSetLagger1, mobSetLagger2, mobSetAntiAimbot = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 autoBatV2SetVisual = nil
 miniBtn, main, gui = nil, nil, nil
 MobilePanel = nil
@@ -4677,6 +4680,54 @@ function disableAutoBat()
     stopSpectrumBypassAimbot()
 end
 
+
+function enableAntiAimbot()
+    antiAimbotEnabled = true
+    if mobSetAntiAimbot then pcall(mobSetAntiAimbot, true) end
+    if antiAimbotFloatingButton then
+        local f = antiAimbotFloatingButton:FindFirstChild("Frame")
+        if f then paintFloatingBtn(f, true) end
+    end
+    if autoLeftEnabled then
+        autoLeftEnabled = false
+        if autoLeftSetVisual then autoLeftSetVisual(false) end
+        stopAutoLeft()
+    end
+    if autoRightEnabled then
+        autoRightEnabled = false
+        if autoRightSetVisual then autoRightSetVisual(false) end
+        stopAutoRight()
+    end
+    if batDesyncTpEnabled then pcall(stopBatDesyncTp) end
+    if autoBatV2Enabled then pcall(disableBatV2) end
+    -- Normal auto bat kapanirsa carpisma olmasin
+    if autoBatEnabled and tostring(batAimbotMode or "") ~= "Bypass" then
+        pcall(disableAutoBat)
+    end
+    batAimbotMode = "Bypass"
+    if batAimbotModeLabel then batAimbotModeLabel.Text = "Bypass  ▼" end
+    startSpectrumBypassAimbot()
+end
+
+function disableAntiAimbot()
+    antiAimbotEnabled = false
+    stopSpectrumBypassAimbot()
+    if mobSetAntiAimbot then pcall(mobSetAntiAimbot, false) end
+    if antiAimbotFloatingButton then
+        local f = antiAimbotFloatingButton:FindFirstChild("Frame")
+        if f then paintFloatingBtn(f, false) end
+    end
+end
+
+function toggleAntiAimbot()
+    if antiAimbotEnabled then
+        disableAntiAimbot()
+    else
+        enableAntiAimbot()
+    end
+    return antiAimbotEnabled
+end
+
 function enableAutoBat()
     if autoLeftEnabled then
         autoLeftEnabled = false
@@ -6114,71 +6165,51 @@ function paintFloatingBtn(btnFrame, active)
     local assetBg = btnFrame:FindFirstChild("BtnAssetBg")
     local assetOv = btnFrame:FindFirstChild("BtnAssetOverlay")
     local WHITE = Color3.fromRGB(255, 255, 255)
-    local BLACK = Color3.fromRGB(0, 0, 0)
-    local GRAY = Color3.fromRGB(40, 40, 40)
-    local CYAN = Color3.fromRGB(200, 200, 205)
+    local RED = Color3.fromRGB(200, 30, 45)
+    local RED_DIM = Color3.fromRGB(140, 25, 35)
+
+    -- Asset arka plan kapali; kirmizi zemin + beyaz yazi
+    if assetBg then assetBg.Visible = false end
+    if assetOv then assetOv.Visible = false end
+    if bg then bg.Enabled = false end
 
     if active then
-        -- Aktif: koyu overlay + beyaz yazi (asset gorunur kalsin)
-        btnFrame.BackgroundColor3 = BLACK
-        btnFrame.BackgroundTransparency = 0.35
-        if bg then
-            bg.Enabled = false
-        end
-        if assetBg then
-            assetBg.ImageTransparency = 0.12
-            assetBg.Visible = true
-        end
-        if assetOv then
-            assetOv.BackgroundTransparency = 0.40
-            assetOv.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        end
+        btnFrame.BackgroundColor3 = RED
+        btnFrame.BackgroundTransparency = 0.05
         if label then
             label.TextColor3 = WHITE
             label.TextTransparency = 0
             label.Visible = true
             label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            label.TextStrokeTransparency = 0.25
+            label.TextStrokeTransparency = 0.35
             label.ZIndex = math.max((btnFrame.ZIndex or 1) + 5, 60)
         end
         if btnFrame:IsA("TextButton") then
             btnFrame.TextTransparency = 1
         end
         if stroke then
-            stroke.Color = CYAN
+            stroke.Color = Color3.fromRGB(255, 120, 130)
             stroke.Thickness = 2
             stroke.Transparency = 0
         end
     else
-        -- Kapali: asset + acik overlay, siyah/beyaz okunakli yazi
-        btnFrame.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
-        btnFrame.BackgroundTransparency = 0.25
-        if bg then
-            bg.Enabled = false
-        end
-        if assetBg then
-            assetBg.ImageTransparency = 0.05
-            assetBg.Visible = true
-        end
-        if assetOv then
-            assetOv.BackgroundTransparency = 0.58
-            assetOv.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        end
+        btnFrame.BackgroundColor3 = RED_DIM
+        btnFrame.BackgroundTransparency = 0.15
         if label then
             label.TextColor3 = WHITE
             label.TextTransparency = 0
             label.Visible = true
             label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            label.TextStrokeTransparency = 0.3
+            label.TextStrokeTransparency = 0.4
             label.ZIndex = math.max((btnFrame.ZIndex or 1) + 5, 60)
         end
         if btnFrame:IsA("TextButton") then
             btnFrame.TextTransparency = 1
         end
         if stroke then
-            stroke.Color = Color3.fromRGB(200, 200, 205)
+            stroke.Color = Color3.fromRGB(255, 80, 90)
             stroke.Thickness = 1.4
-            stroke.Transparency = 0.25
+            stroke.Transparency = 0.2
         end
     end
 end
@@ -6433,6 +6464,8 @@ function buildConfigTable()
         fovEnabled = fovEnabled,
         fovValue = fovValue,
         uiScale = uiScaleValue,
+        stealBarScale = stealBarScale or 100,
+        antiAimbot = antiAimbotEnabled == true,
         animPack = currentAnimPack,
         espEnabled = espEnabled,
         antiLag = antiLagEnabled,
@@ -6671,8 +6704,10 @@ function loadAllSettings()
     laggerCarryToggled = data.laggerCarryToggled or false
 
     uiScaleValue = data.uiScale or uiScaleValue or 78
+    stealBarScale = data.stealBarScale or stealBarScale or 100
     if mainUIScale then mainUIScale.Scale = uiScaleValue / 100 end
-    if pbScale then pbScale.Scale = uiScaleValue / 100 end
+    if pbScale then pbScale.Scale = (tonumber(stealBarScale) or 100) / 100 end
+    if data.antiAimbot == true then antiAimbotEnabled = true end
     if data.autoTpDownRadius ~= nil then
         autoTpDownRadius = tonumber(data.autoTpDownRadius) or autoTpDownRadius
         if autoTpDownRadiusBox then autoTpDownRadiusBox.Text = tostring(autoTpDownRadius) end
@@ -7111,6 +7146,9 @@ function resetToFactoryDefaults()
         if fovSliderSet then fovSliderSet(70) end
         if setFovVisual then setFovVisual(false) end
         uiScaleValue = 78
+stealBarScale = 100
+antiAimbotEnabled = false
+setAntiAimbotVisual = nil
         if mainUIScale then mainUIScale.Scale = 1 end
         if pbScale then pbScale.Scale = 1 end
         espEnabled = false
@@ -7192,7 +7230,7 @@ function getDefaultButtonPosition(btnName)
     local GAP = 8
     local orderMap = {
         DropBR = 0, AutoLeft = 1, AutoBat = 2,
-        AutoRight = 3, TpDown = 4, Carry = 5, Lagger1 = 6, Lagger2 = 7
+        AutoRight = 3, TpDown = 4, Carry = 5, Lagger1 = 6, Lagger2 = 7, AntiAimbot = 8
     }
     local order = orderMap[btnName] or 0
     local row = _floor(order / 2)
@@ -10358,6 +10396,7 @@ function buildGui()
         refreshOpts()
     end
 
+
     mkToggle(combatPage, "Ping Lagger Panel", function(on)
         if on then
             local g = createSakuraPingLaggerPanel()
@@ -10882,7 +10921,17 @@ function buildGui()
             local n = _clamp(_floor(v+0.5), 50, 150)
             uiScaleValue = n
             if mainUIScale then mainUIScale.Scale = n/100 end
+        end)
+    end
+
+    do
+        local row = mkRow(configPage, 38)
+        mkLabel(row, "Steal Bar Scale")
+        mkBox(row, stealBarScale or 100, 50, 56, function(v)
+            local n = _clamp(_floor(v+0.5), 50, 200)
+            stealBarScale = n
             if pbScale then pbScale.Scale = n/100 end
+            pcall(saveAllSettings)
         end)
     end
 
@@ -11104,13 +11153,13 @@ function buildGui()
     spacer.ZIndex = 7
 
     -- ============================================================
-    -- AUTO STEAL BAR — compact (image style), red/white, no Discord
+    -- AUTO STEAL BAR — long rectangle, red/white (image layout)
     -- ============================================================
     pbFrame = Instance.new("Frame", gui)
-    pbFrame.Size = UDim2.new(0, 380, 0, 44)
-    pbFrame.Position = UDim2.new(0.5, -190, 1, -58)
-    pbFrame.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
-    pbFrame.BackgroundTransparency = 0.12
+    pbFrame.Size = UDim2.new(0, 420, 0, 42)
+    pbFrame.Position = UDim2.new(0.5, -210, 1, -56)
+    pbFrame.BackgroundColor3 = Color3.fromRGB(20, 24, 34)
+    pbFrame.BackgroundTransparency = 0.08
     pbFrame.BorderSizePixel = 0
     pbFrame.Active = true
     pbFrame.ClipsDescendants = true
@@ -11118,107 +11167,101 @@ function buildGui()
     pbFrame.ZIndex = 50
 
     local pbCorner = Instance.new("UICorner", pbFrame)
-    pbCorner.CornerRadius = UDim.new(0, 14)
+    pbCorner.CornerRadius = UDim.new(0, 12)
 
     local pbBorder = Instance.new("UIStroke", pbFrame)
     pbBorder.Name = "StealBarStroke"
-    pbBorder.Color = Color3.fromRGB(220, 40, 50)
-    pbBorder.Thickness = 1.6
-    pbBorder.Transparency = 0.15
+    pbBorder.Color = Color3.fromRGB(230, 50, 60)
+    pbBorder.Thickness = 1.5
+    pbBorder.Transparency = 0.12
     pbBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     pbScale = Instance.new("UIScale", pbFrame)
-    pbScale.Scale = uiScaleValue / 100
+    pbScale.Scale = (tonumber(stealBarScale) or 100) / 100
 
     if savedProgressBarPos then
         pbFrame.Position = UDim2.new(
             savedProgressBarPos.XScale or 0.5,
-            savedProgressBarPos.XOffset or -190,
+            savedProgressBarPos.XOffset or -210,
             savedProgressBarPos.YScale or 1,
-            savedProgressBarPos.YOffset or -58
+            savedProgressBarPos.YOffset or -56
         )
     end
 
     -- SOL: %
     local leftCol = Instance.new("Frame", pbFrame)
     leftCol.Name = "LeftCol"
-    leftCol.Size = UDim2.new(0, 58, 1, -8)
-    leftCol.Position = UDim2.new(0, 12, 0, 4)
+    leftCol.Size = UDim2.new(0, 54, 1, -6)
+    leftCol.Position = UDim2.new(0, 10, 0, 3)
     leftCol.BackgroundTransparency = 1
     leftCol.ZIndex = 55
 
     progressPct = Instance.new("TextLabel", leftCol)
     progressPct.Name = "ProgressPct"
     progressPct.Size = UDim2.new(1, 0, 1, 0)
-    progressPct.Position = UDim2.new(0, 0, 0, 0)
     progressPct.BackgroundTransparency = 1
     progressPct.Text = "0%"
     progressPct.TextColor3 = Color3.fromRGB(255, 255, 255)
     progressPct.Font = Enum.Font.GothamBlack
-    progressPct.TextSize = 18
+    progressPct.TextSize = 16
     progressPct.TextXAlignment = Enum.TextXAlignment.Left
     progressPct.TextYAlignment = Enum.TextYAlignment.Center
     progressPct.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    progressPct.TextStrokeTransparency = 0.25
+    progressPct.TextStrokeTransparency = 0.3
     progressPct.ZIndex = 56
 
-    -- ORTA: progress bar
+    -- ORTA: progress
     local progressRow = Instance.new("Frame", pbFrame)
     progressRow.Name = "ProgressRow"
-    progressRow.Size = UDim2.new(1, -210, 0, 12)
-    progressRow.Position = UDim2.new(0, 72, 0.5, -6)
+    progressRow.Size = UDim2.new(1, -220, 0, 11)
+    progressRow.Position = UDim2.new(0, 66, 0.5, -5.5)
     progressRow.BackgroundTransparency = 1
     progressRow.ZIndex = 54
 
     local fillRegion = Instance.new("Frame", progressRow)
     fillRegion.Name = "FillRegion"
     fillRegion.Size = UDim2.new(1, 0, 1, 0)
-    fillRegion.BackgroundColor3 = Color3.fromRGB(30, 34, 44)
-    fillRegion.BackgroundTransparency = 0.15
+    fillRegion.BackgroundColor3 = Color3.fromRGB(28, 32, 42)
+    fillRegion.BackgroundTransparency = 0.1
     fillRegion.BorderSizePixel = 0
     fillRegion.ClipsDescendants = true
     fillRegion.ZIndex = 55
     Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(1, 0)
-    local fillStroke = Instance.new("UIStroke", fillRegion)
-    fillStroke.Color = Color3.fromRGB(90, 30, 40)
-    fillStroke.Thickness = 1
-    fillStroke.Transparency = 0.4
 
     progressFill = Instance.new("Frame", fillRegion)
     progressFill.Name = "ProgressFill"
     progressFill.Size = UDim2.new(0, 0, 1, 0)
-    progressFill.BackgroundColor3 = Color3.fromRGB(230, 40, 55)
+    progressFill.BackgroundColor3 = Color3.fromRGB(230, 45, 55)
     progressFill.BorderSizePixel = 0
     progressFill.ZIndex = 56
     Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
     local fillGrad = Instance.new("UIGradient", progressFill)
     fillGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 20, 35)),
-        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 70, 80)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 240, 240)),
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(170, 20, 30)),
+        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 70, 80)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255)),
     })
 
     local glowEnd = Instance.new("Frame", progressFill)
-    glowEnd.Size = UDim2.new(0, 14, 1, 0)
-    glowEnd.Position = UDim2.new(1, -14, 0, 0)
+    glowEnd.Size = UDim2.new(0, 12, 1, 0)
+    glowEnd.Position = UDim2.new(1, -12, 0, 0)
     glowEnd.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    glowEnd.BackgroundTransparency = 0.45
+    glowEnd.BackgroundTransparency = 0.4
     glowEnd.BorderSizePixel = 0
     glowEnd.ZIndex = 57
     Instance.new("UICorner", glowEnd).CornerRadius = UDim.new(1, 0)
 
-    -- SAĞ: FPS + MS (tek satır)
+    -- SAĞ: FPS - MS
     local rightCol = Instance.new("Frame", pbFrame)
     rightCol.Name = "RightCol"
-    rightCol.Size = UDim2.new(0, 120, 1, -8)
-    rightCol.Position = UDim2.new(1, -128, 0, 4)
+    rightCol.Size = UDim2.new(0, 130, 1, -6)
+    rightCol.Position = UDim2.new(1, -138, 0, 3)
     rightCol.BackgroundTransparency = 1
     rightCol.ZIndex = 55
 
     local fpsNeon = Instance.new("TextLabel", rightCol)
     fpsNeon.Name = "FPSNeon"
     fpsNeon.Size = UDim2.new(1, 0, 1, 0)
-    fpsNeon.Position = UDim2.new(0, 0, 0, 0)
     fpsNeon.BackgroundTransparency = 1
     fpsNeon.Text = "--FPS - --ms"
     fpsNeon.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -11227,10 +11270,9 @@ function buildGui()
     fpsNeon.TextXAlignment = Enum.TextXAlignment.Right
     fpsNeon.TextYAlignment = Enum.TextYAlignment.Center
     fpsNeon.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    fpsNeon.TextStrokeTransparency = 0.3
+    fpsNeon.TextStrokeTransparency = 0.35
     fpsNeon.ZIndex = 56
 
-    -- Discord yok
     local discordLabelTop = Instance.new("TextLabel", pbFrame)
     discordLabelTop.Name = "DiscordLabel"
     discordLabelTop.Visible = false
@@ -11327,6 +11369,9 @@ function applyFloatingButtonShape()
     if instaResetFloatingButton then
         applyTo(instaResetFloatingButton:FindFirstChild("Frame") or instaResetFloatingButton)
     end
+    if antiAimbotFloatingButton then
+        applyTo(antiAimbotFloatingButton:FindFirstChild("Frame") or antiAimbotFloatingButton)
+    end
 end
 
 function createMobilePanel()
@@ -11343,6 +11388,7 @@ function createMobilePanel()
     local GAP = 8
     local COLUMNS = 2
     local ROWS = 5
+    -- 9 buttons (includes AntiAimbot)
     local PANEL_W = BTN_W * COLUMNS + GAP * (COLUMNS - 1)
     local PANEL_H = BTN_H * ROWS + (GAP + 10) * (ROWS - 1)
 
@@ -11377,8 +11423,8 @@ function createMobilePanel()
     local ACTIVE_TEXT = Color3.fromRGB(0, 0, 0)
 
     local buttons = {}
-    local buttonNames = {"DropBR", "AutoLeft", "AutoBat", "AutoRight", "TpDown", "Carry", "Lagger1", "Lagger2"}
-    local buttonTexts = {"DROP\nBR", "AUTO\nLEFT", "BAT\nAIMBOT", "AUTO\nRIGHT", "TP\nDOWN", "CARRY\nSPD", "LAGGER\nNORMAL", "LAGGER\nCARRY"}
+    local buttonNames = {"DropBR", "AutoLeft", "AutoBat", "AutoRight", "TpDown", "Carry", "Lagger1", "Lagger2", "AntiAimbot"}
+    local buttonTexts = {"DROP\nBR", "AUTO\nLEFT", "BAT\nAIMBOT", "AUTO\nRIGHT", "TP\nDOWN", "CARRY\nSPD", "LAGGER\nNORMAL", "LAGGER\nCARRY", "ANTI\nAIMBOT"}
 
     local function createButton(name, text, order, isToggle, callback)
         local btn = Instance.new("TextButton", btnContainer)
@@ -11568,6 +11614,12 @@ function createMobilePanel()
                 if not autoBatEnabled then enableAutoBat() else disableAutoBat() end
                 setActive(autoBatEnabled)
             end
+        elseif name == "AntiAimbot" then
+            callback = function(setActive)
+                toggleAntiAimbot()
+                setActive(antiAimbotEnabled)
+                pcall(saveAllSettings)
+            end
         elseif name == "AutoRight" then
             callback = function(setActive)
                 autoRightEnabled = not autoRightEnabled
@@ -11633,6 +11685,7 @@ function createMobilePanel()
         if name == "Carry" then mobSetCarry = setActive end
         if name == "Lagger1" then mobSetLagger1 = setActive end
         if name == "Lagger2" then mobSetLagger2 = setActive end
+        if name == "AntiAimbot" then mobSetAntiAimbot = setActive end
     end
 
     if buttons.AutoBat and buttons.AutoBat.setActive then buttons.AutoBat.setActive(autoBatEnabled) end
@@ -11641,6 +11694,7 @@ function createMobilePanel()
     if buttons.Carry and buttons.Carry.setActive then buttons.Carry.setActive(speedMode) end
     if buttons.Lagger1 and buttons.Lagger1.setActive then buttons.Lagger1.setActive(laggerToggled) end
     if buttons.Lagger2 and buttons.Lagger2.setActive then buttons.Lagger2.setActive(laggerCarryToggled) end
+    if buttons.AntiAimbot and buttons.AntiAimbot.setActive then buttons.AntiAimbot.setActive(antiAimbotEnabled) end
 
     -- Restore saved panel position, fallback to right side
     do
@@ -11816,6 +11870,109 @@ function createTpBatFloatingButton()
 
     paintFloatingBtn(btnFrame, batDesyncTpEnabled == true)
     tpBatFloatingButton = panel
+    return panel
+end
+
+
+antiAimbotFloatingButton = nil
+antiAimbotFloatingPos = nil
+
+function createAntiAimbotFloatingButton()
+    local panel = Instance.new("ScreenGui")
+    panel.Name = "AntiAimbotButton"
+    panel.ResetOnSpawn = false
+    panel.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    panel.DisplayOrder = 22
+    pcall(function() if syn and syn.protect_gui then syn.protect_gui(panel) end end)
+    local okPanel = pcall(function() panel.Parent = game:GetService("CoreGui") end)
+    if not okPanel then panel.Parent = LP:WaitForChild("PlayerGui") end
+
+    local btnFrame = Instance.new("Frame", panel)
+    btnFrame.Size = UDim2.new(0, 60, 0, 60)
+    btnFrame.Name = "Frame"
+    if antiAimbotFloatingPos then
+        btnFrame.Position = UDim2.new(antiAimbotFloatingPos.XScale or 0.5,
+                                      antiAimbotFloatingPos.XOffset or 160,
+                                      antiAimbotFloatingPos.YScale or 0,
+                                      antiAimbotFloatingPos.YOffset or 10)
+    else
+        btnFrame.Position = UDim2.new(0.5, 160, 0, 10)
+    end
+    btnFrame.BackgroundColor3 = Color3.fromRGB(200, 30, 45)
+    btnFrame.BackgroundTransparency = 0
+    btnFrame.BorderSizePixel = 0
+    btnFrame.ZIndex = 20
+    Instance.new("UICorner", btnFrame).CornerRadius = getFloatingCornerRadius()
+    local bgGrad = Instance.new("UIGradient", btnFrame)
+    bgGrad.Name = "BtnGrad"
+    bgGrad.Rotation = 90
+    bgGrad.Enabled = false
+    local stroke = Instance.new("UIStroke", btnFrame)
+    stroke.Color = Color3.fromRGB(255, 80, 90)
+    stroke.Thickness = 1.4
+    stroke.Transparency = 0.2
+    local label = Instance.new("TextLabel", btnFrame)
+    label.Name = "TextLabel"
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "ANTI\nAIMBOT"
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Font = Enum.Font.GothamBlack
+    label.TextSize = 10
+    label.TextWrapped = true
+    label.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+    label.TextStrokeTransparency = 0.3
+    label.ZIndex = 60
+
+    local uiScale = Instance.new("UIScale", btnFrame)
+    uiScale.Scale = floatingButtonScale
+    table.insert(_floatingUIScales, uiScale)
+
+    local function setActive(state)
+        label.Text = "ANTI\nAIMBOT"
+        paintFloatingBtn(btnFrame, state)
+    end
+
+    local dragging = false; local hasMoved = false; local dragStart, startPos
+    btnFrame.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; hasMoved = false; dragStart = inp.Position; startPos = btnFrame.Position
+        end
+    end)
+    btnFrame.InputChanged:Connect(function(inp)
+        if not dragging then return end
+        if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
+            local delta = inp.Position - dragStart
+            if delta.Magnitude > 5 then hasMoved = true end
+            if hasMoved and not uiLocked then
+                btnFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                              startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    btnFrame.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            if dragging then
+                if not hasMoved then
+                    toggleAntiAimbot()
+                    setActive(antiAimbotEnabled)
+                    pcall(saveAllSettings)
+                elseif not uiLocked and hasMoved then
+                    antiAimbotFloatingPos = {
+                        XScale = btnFrame.Position.X.Scale,
+                        XOffset = btnFrame.Position.X.Offset,
+                        YScale = btnFrame.Position.Y.Scale,
+                        YOffset = btnFrame.Position.Y.Offset
+                    }
+                    pcall(saveAllSettings)
+                end
+                dragging = false; hasMoved = false
+            end
+        end
+    end)
+
+    paintFloatingBtn(btnFrame, antiAimbotEnabled == true)
+    antiAimbotFloatingButton = panel
     return panel
 end
 
@@ -12331,6 +12488,7 @@ function updateUIFromLoaded()
     if autoStealVariantLabel then autoStealVariantLabel.Text = autoStealVariantName(autoStealVariant or 1) end
     if infJumpModeLabel then infJumpModeLabel.Text = tostring(infJumpMode or "HOLD") end
     if CONFIG.AUTO_STEAL_ENABLED and setInstaGrab then setInstaGrab(true); pcall(startAutoSteal) end
+    if antiAimbotEnabled then pcall(enableAntiAimbot) end
 
     if medusaCounterEnabled then
         if setMedusaVisual then setMedusaVisual(true) end
@@ -12938,6 +13096,7 @@ task.spawn(function()
     MobilePanel = createMobilePanel()
     pcall(applyFloatingButtonShape)
     tpBatFloatingButton = createTpBatFloatingButton()
+    antiAimbotFloatingButton = createAntiAimbotFloatingButton()
     batV2FloatingButton = nil -- Bat V2 removed from GUI
     -- batV2FloatingButton = createBatV2FloatingButton()
     instaResetFloatingButton = createInstaResetFloatingButton()
